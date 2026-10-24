@@ -22,12 +22,20 @@ label{display:grid;grid-template-columns:130px 200px;gap:10px;align-items:center
 #bt button{pointer-events:auto;min-width:0;padding:6px 14px;font-size:11px;margin:0 4px}
 #bo{background:linear-gradient(90deg,var(--o),#ffd24a)}.big{height:10px}
 #fx{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(#0000 45%,#19e6ff66);transition:opacity .2s}
+#tc{display:none;--ts:clamp(72px,20vmin,92px)}
+.tb{position:relative;width:var(--ts);height:var(--ts);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:900;color:var(--fg);background:#070a1cb0;border:2px solid var(--bc);border-radius:26px;box-shadow:0 0 16px var(--bc),inset 0 0 14px #ffffff22;text-shadow:0 0 8px var(--bc);touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;pointer-events:auto}
+.tb b{font-size:clamp(24px,6.5vmin,34px);line-height:1}.tb small{font-size:10px;letter-spacing:.15em;font-weight:700;opacity:.85}
+.tb.dn{background:var(--bc);color:#001018;text-shadow:none;box-shadow:0 0 30px var(--bc)}
+#tlr{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;z-index:5}
+#tacc{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(134px + env(safe-area-inset-bottom,0px));width:clamp(88px,26vmin,120px);height:clamp(88px,26vmin,120px);border-radius:34px;z-index:5}
+@media (hover:none) and (pointer:coarse){#tc.on{display:block}body{touch-action:manipulation}}
 </style></head><body>
 <div id="fx"></div>
 <div id="hud"><div id="tl"><div id="lap"></div><div id="tm"></div></div><div id="tr"><div id="pos"></div><small id="orbs"></small></div>
 <div id="bt"><button id="bp">PAUSE</button><button id="bre">RESTART</button></div><div id="cd"></div>
 <div id="bl">W/↑ Accelerate · S/↓ Brake · A/D Steer · Space Boost · Shift Drift · Esc Pause</div>
 <div id="br"><span id="sp">0</span> <small>km/h</small><div class="bar big"><i id="bo"></i></div><small>BOOST</small></div></div>
+<div id="tc"><div id="tlr"><div class="tb" data-k="KeyA" style="--bc:var(--c)" aria-label="Steer left"><b>◀</b><small>LEFT</small></div><div class="tb" data-k="KeyD" style="--bc:var(--p)" aria-label="Steer right"><b>▶</b><small>RIGHT</small></div></div><div class="tb" id="tacc" data-k="KeyW" style="--bc:var(--o)" aria-label="Accelerate"><b>▲</b><small>ACCEL</small></div></div>
 <div class="s" id="menu"><h1>GRAVITY RUSH</h1><p>Anti-gravity arcade racing</p><button id="bplay">PLAY</button><button id="bgar">GARAGE</button><button id="bset">SETTINGS</button><button id="bhow">HOW TO PLAY</button></div>
 <div class="s" id="garage"><h2>GARAGE</h2><div class="row" id="cards"></div><button data-back>BACK</button></div>
 <div class="s" id="set"><h2>SETTINGS</h2>
@@ -172,6 +180,7 @@ $('rt').innerHTML=`Time <b>${fmt(rt)}</b> · Laps <b>${LAPS}/${LAPS}</b> · Ener
 function togglePause(){if(state==='race'||state==='count'){from=state;state='paused';show('pause')}else if(state==='paused'){state=from;show('')}}
 let last=performance.now();
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
+const tcOn=state==='race'||state==='count';if(tcOn!==tcPrev){tcPrev=tcOn;$('tc').classList.toggle('on',tcOn);if(!tcOn)tcRel()}
 if(state!=='paused'){tt+=dt;shake*=Math.exp(-5*dt);
 if(state==='menu'||state==='fin')all.forEach(p=>stepA(p,dt));
 else if(state==='count'){cdT-=dt;const n=Math.ceil(cdT);if(n!==lastN){lastN=n;if(n>0&&n<4){$('cd').textContent=n;sfx('beep')}}if(cdT<=0){state='race';rt=0;$('cd').textContent='GO!';sfx('go');setTimeout(()=>{if($('cd').textContent==='GO!')$('cd').textContent=''},900)}}
@@ -192,5 +201,15 @@ document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>show('menu'));
 $('vm').oninput=e=>{S.music=+e.target.value;setVol()};$('vs').oninput=e=>{S.sfx=+e.target.value;setVol()};$('sn').oninput=e=>S.sens=+e.target.value;
 $('q').onchange=e=>{S.q=+e.target.value;resize();city.visible=caps.visible=S.q>0};$('fxo').onchange=e=>S.fx=e.target.checked;
 addEventListener('blur',()=>{if(state==='race')togglePause()});
+/* mobile touch controls: drive the same KY keys that inp()/stepP() already read */
+let tcPrev=false;
+function tcRel(){document.querySelectorAll('.tb').forEach(b=>b._rel())}
+document.querySelectorAll('.tb').forEach(b=>{const k=b.dataset.k,ids=new Set(),set=()=>{KY[k]=ids.size?1:0;b.classList.toggle('dn',ids.size>0)},drop=e=>{if(ids.delete(e.pointerId))set()};
+b.addEventListener('pointerdown',e=>{e.preventDefault();ids.add(e.pointerId);set()});
+['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t,drop));
+b.addEventListener('pointermove',e=>{if(ids.has(e.pointerId)){const r=b.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)drop(e)}});
+b.addEventListener('contextmenu',e=>e.preventDefault());
+b._rel=()=>{if(ids.size){ids.clear();set()}}});
+addEventListener('blur',tcRel);addEventListener('orientationchange',tcRel);document.addEventListener('visibilitychange',()=>{if(document.hidden)tcRel()});
 resize();setCraft(0);toMenu();requestAnimationFrame(loop);
 </script></body></html>
